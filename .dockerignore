@@ -1,0 +1,7 @@
+.DS_Store
+.env.local
+.git
+*.log
+samples/
+scripts/
+!scripts/check-runtime-tools.sh

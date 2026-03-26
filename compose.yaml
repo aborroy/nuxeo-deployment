@@ -1,0 +1,56 @@
+name: nuxeo-deployment
+
+services:
+  nuxeo-db:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nuxeo}
+      POSTGRES_USER: ${POSTGRES_USER:-nuxeo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nuxeo}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nuxeo} -d ${POSTGRES_DB:-nuxeo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - nuxeo-db-data:/var/lib/postgresql/data
+
+  nuxeo:
+    platform: ${NUXEO_PLATFORM:-linux/amd64}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NUXEO_GIT_TRACK: ${NUXEO_GIT_TRACK}
+        NUXEO_GIT_REF: ${NUXEO_GIT_REF}
+        NUXEO_SOURCE_ARCHIVE_URL: ${NUXEO_SOURCE_ARCHIVE_URL}
+        NUXEO_BUILD_THREADS: ${NUXEO_BUILD_THREADS}
+        NUXEO_WEBUI_GIT_REF: ${NUXEO_WEBUI_GIT_REF}
+        NUXEO_WEBUI_VERSION: ${NUXEO_WEBUI_VERSION}
+    image: ${NUXEO_IMAGE_NAME:-nuxeo-deployment:nuxeo-local}
+    depends_on:
+      nuxeo-db:
+        condition: service_healthy
+    environment:
+      NUXEO_DB_NAME: ${POSTGRES_DB:-nuxeo}
+      NUXEO_DB_USER: ${POSTGRES_USER:-nuxeo}
+      NUXEO_DB_PWD: ${POSTGRES_PASSWORD:-nuxeo}
+      NUXEO_DB_HOST: nuxeo-db
+      NUXEO_DB_PORT: 5432
+      NUXEO_DB_TYPE: postgresql
+      NUXEO_PACKAGES: ${NUXEO_PACKAGES:-}
+      NUXEO_DEV: ${NUXEO_DEV:-true}
+      NUXEO_FORCE_CONF: "true"
+    ports:
+      - "${NUXEO_HTTP_PORT:-8081}:8080"
+    volumes:
+      - nuxeo-data:/var/lib/nuxeo
+      - nuxeo-config:/etc/nuxeo
+      - nuxeo-logs:/var/log/nuxeo
+
+volumes:
+  nuxeo-db-data:
+  nuxeo-data:
+  nuxeo-config:
+  nuxeo-logs:

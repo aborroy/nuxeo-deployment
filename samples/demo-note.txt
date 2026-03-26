@@ -1,0 +1,1 @@
+This is a bootstrap sample for the future nuxeo-deployment smoke tests.
