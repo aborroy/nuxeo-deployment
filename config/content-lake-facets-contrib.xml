@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<component name="org.hyland.contentlake.schema.ContentLakeFacets">
+
+  <extension target="org.nuxeo.ecm.core.schema.TypeService" point="schema">
+    <schema name="contentLakeScope"
+            src="schema/content-lake-scope.xsd"
+            prefix="cls"/>
+  </extension>
+
+  <extension target="org.nuxeo.ecm.core.schema.TypeService" point="facets">
+    <!--
+      Marker facet: presence on a folder subtree-marks it as in-scope for Content Lake
+      ingestion.  No properties; the facet is applied via PUT /api/v1/id/{uid} at
+      runtime without a service restart.
+    -->
+    <facet name="ContentLakeIndexed"/>
+
+    <!--
+      Override facet: when cls:excludeFromScope is set to true on a folder or document,
+      that node and its entire subtree are excluded from ingestion even when an ancestor
+      folder carries ContentLakeIndexed.
+    -->
+    <facet name="ContentLakeScope">
+      <schema name="contentLakeScope"/>
+    </facet>
+  </extension>
+
+</component>

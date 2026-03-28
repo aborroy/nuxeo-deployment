@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:nxs="http://www.nuxeo.org/ecm/schemas/core/"
+           targetNamespace="http://www.nuxeo.org/ecm/schemas/contentlake/scope/"
+           xmlns="http://www.nuxeo.org/ecm/schemas/contentlake/scope/"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <!--
+    Schema for the ContentLakeScope facet.
+    Prefix: cls
+    When cls:excludeFromScope is true, the document (or folder subtree) is
+    excluded from Content Lake ingestion even when an ancestor folder has the
+    ContentLakeIndexed facet.
+  -->
+  <xs:element name="excludeFromScope" type="xs:boolean" nxs:hasDefault="true"/>
+
+</xs:schema>

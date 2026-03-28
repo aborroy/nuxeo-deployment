@@ -169,6 +169,8 @@ COPY --from=source-build /build-output/nuxeo-source-ref.txt /usr/local/share/nux
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-marketplace.zip /tmp/nuxeo-web-ui-marketplace.zip
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-version.txt /usr/local/share/nuxeo-web-ui-version.txt
 COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
+COPY --chown=900:0 config/content-lake-facets-contrib.xml ${NUXEO_HOME}/nxserver/config/content-lake-facets-contrib.xml
+COPY --chown=900:0 config/schema/ ${NUXEO_HOME}/nxserver/config/schema/
 
 RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
  && /usr/local/bin/check-runtime-tools.sh
