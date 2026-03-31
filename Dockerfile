@@ -191,9 +191,8 @@ COPY --from=facets-bundle --chown=900:0 /build-output/content-lake-facets-bundle
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-marketplace.zip /tmp/nuxeo-web-ui-marketplace.zip
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-version.txt /usr/local/share/nuxeo-web-ui-version.txt
 COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
-COPY scripts/patch-web-ui-config.sh /docker-entrypoint-initnuxeo.d/patch-web-ui-config.sh
 
-RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh /docker-entrypoint-initnuxeo.d/patch-web-ui-config.sh \
+RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
  && /usr/local/bin/check-runtime-tools.sh
 
 RUN mkdir -p /etc/nuxeo \
