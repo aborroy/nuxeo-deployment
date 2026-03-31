@@ -17,6 +17,10 @@ Nuxeo LTS deployment built from source code.
 - working conversion smoke test with REST-based rendition verification
 - consumption patterns documented for `alfresco-content-lake-deploy`
 - sample assets directory
+- Content Lake facet definitions (`ContentLakeIndexed`, `ContentLakeScope`, `cls:excludeFromScope`)
+  deployed into the Nuxeo server config at build time (see [Content Lake Customizations](#content-lake-customizations))
+- Nuxeo Web UI custom element for managing folder indexing scope from the browser UI, with smoke
+  test for the facet REST API
 
 The current implementation builds the Nuxeo server ZIP from public source and then assembles the
 runtime image using the upstream `docker/nuxeo` layout. This is a deliberate adaptation of the
@@ -44,14 +48,27 @@ nuxeo-deployment/
 ├── README.md
 ├── SECURITY.md
 ├── compose.yaml
+├── config/
+│   ├── content-lake-facets-contrib.xml   ← Nuxeo component extension: facet definitions
+│   └── schema/
+│       └── content-lake-scope.xsd        ← XSD schema for the cls: property namespace
 ├── samples/
 │   ├── README.md
 │   └── demo-note.txt
-└── scripts/
-    ├── check-bootstrap.sh
-    ├── check-runtime-tools.sh
-    ├── smoke-conversion.sh
-    └── smoke-events.sh
+├── scripts/
+│   ├── check-bootstrap.sh
+│   ├── check-runtime-tools.sh
+│   ├── smoke-conversion.sh
+│   ├── smoke-events.sh
+│   └── smoke-facets.sh                   ← verifies ContentLakeIndexed / ContentLakeScope REST API
+├── ui/
+│   ├── nuxeo-custom-bundle.html          ← appended into nuxeo-web-ui-bundle.html by the deployment fragment
+│   └── content-lake-folder-control.html  ← Polymer element: folder indexing toggles
+├── ui-bundle/                            ← OSGI bundle assembled into nxserver/bundles/ at image build time
+│   ├── META-INF/
+│   │   └── MANIFEST.MF
+│   └── OSGI-INF/
+│       └── deployment-fragment.xml
 ```
 
 ## Local Contract
@@ -184,6 +201,63 @@ first, or have the image available via a registry pull.
 
 Within the shared Docker Compose network the service is reachable at `http://nuxeo:8080/nuxeo`.
 
+## Content Lake Customizations
+
+This deployment extends a stock Nuxeo server with two layers of customization for the Content Lake
+indexing pipeline.
+
+### Content model — `config/`
+
+`config/content-lake-facets-contrib.xml` registers two custom facets via the
+`org.nuxeo.ecm.core.schema.TypeService` extension point:
+
+| Facet | Type | Purpose |
+|---|---|---|
+| `ContentLakeIndexed` | Marker (no schema) | Presence on a folder marks its entire subtree as in-scope for Content Lake ingestion |
+| `ContentLakeScope` | Schema-bearing | Carries the `contentLakeScope` schema (prefix `cls`); used to exclude a subtree |
+
+`config/schema/content-lake-scope.xsd` defines the single property in that schema:
+
+| Property | Type | Default | Meaning |
+|---|---|---|---|
+| `cls:excludeFromScope` | `xs:boolean` | `false` | When `true`, the folder and all descendants are excluded from ingestion even if an ancestor has `ContentLakeIndexed` |
+
+Both XML files and the schema directory are copied into `${NUXEO_HOME}/nxserver/config/` at
+Docker build time so they are available on every startup without a Marketplace package or Connect
+account.
+
+The `NuxeoScopeResolver` in `content-lake-app` reads these facets at runtime to decide which
+documents enter the ingestion pipeline. `NuxeoAuditListener` (nuxeo-live-ingester) invalidates
+the scope cache and triggers subtree re-evaluation whenever a folder carrying either facet receives
+a `documentModified` audit event.
+
+### Web UI — `ui/`
+
+`ui/nuxeo-custom-bundle.html` is the local customization entry point. The runtime deployment
+fragment appends its `<link rel="import" href="nuxeo-custom-bundle.html">` line into
+`${NUXEO_HOME}/nxserver/nuxeo.war/ui/nuxeo-web-ui-bundle.html`, which is the bundle the running
+Web UI actually loads. The custom bundle then imports `content-lake-folder-control.html`.
+
+`ui/content-lake-folder-control.html` is a Polymer 3 custom element that contributes a panel to
+the `DOCUMENT_ACTIONS` slot in the document toolbar. It renders only on documents that have the
+`Folderish` facet (Folder, Workspace) and provides:
+
+| Toggle | Facet change | Condition |
+|---|---|---|
+| **Index in Content Lake** | Adds / removes `ContentLakeIndexed` | Always shown on folderish documents |
+| **Exclude from Content Lake** | Adds / removes `ContentLakeScope` + sets `cls:excludeFromScope` | Shown only when `ContentLakeIndexed` is already set on this folder |
+
+Both toggles are disabled while a request is in flight (a `saving` flag mirrors the Alfresco ACA
+`ContentLakeSidebarComponent` pattern). Facet changes use a GET-then-PUT strategy to preserve any
+pre-existing mixin facets on the document, matching the Alfresco `copyAspectNames` approach.
+
+The Dockerfile assembles `ui-bundle/` into a small jar and copies it to
+`${NUXEO_HOME}/nxserver/bundles/`. On startup, its `deployment-fragment.xml` requires
+`org.nuxeo.web.ui`, unzips `content-lake-folder-control.html` into `nuxeo.war/ui/`, and appends
+`nuxeo-custom-bundle.html` into `nuxeo-web-ui-bundle.html`. That keeps the upstream Web UI bundle
+intact while ensuring the Content Lake slot contribution is loaded on authenticated Web UI
+sessions.
+
 ## Audit and Event Settings
 
 The `nuxeo.stream.audit.enabled` and `audit.elasticsearch.enabled` overrides that appeared in the
@@ -209,6 +283,9 @@ not required here and have been intentionally omitted.
   `Blob.ToPDF`, and then probes the FFmpeg-backed video path by uploading a tiny generated MP4 and
   polling `GET /api/v1/id/{uid}?schemas=vid` until `vid:transcodedVideos` is populated (2-minute
   timeout).
+- `scripts/smoke-facets.sh` creates a temporary Workspace folder, applies `ContentLakeIndexed` via
+  `PUT /api/v1/id/{uid}`, verifies the facet is returned in a subsequent GET, then applies
+  `ContentLakeScope` with `cls:excludeFromScope: true` and verifies both, then trashes the folder.
 
 Run the bootstrap check with:
 
@@ -232,4 +309,10 @@ Run the conversion smoke test with:
 
 ```bash
 ./scripts/smoke-conversion.sh
+```
+
+Run the Content Lake facets smoke test with:
+
+```bash
+./scripts/smoke-facets.sh
 ```

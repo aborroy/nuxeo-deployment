@@ -40,6 +40,27 @@ RUN mkdir -p /build-output \
  && cp server/nuxeo-server-tomcat/target/nuxeo-server-tomcat-*.zip /build-output/nuxeo-server-tomcat.zip \
  && cp .nuxeo-source-ref /build-output/nuxeo-source-ref.txt
 
+FROM ${NUXEO_BUILD_IMAGE} AS facets-bundle
+
+WORKDIR /workspace/facets-bundle
+
+COPY config/content-lake-facets-contrib.xml /workspace/facets-bundle/OSGI-INF/content-lake-facets-contrib.xml
+COPY config/schema/content-lake-scope.xsd /workspace/facets-bundle/schema/content-lake-scope.xsd
+
+RUN mkdir -p /workspace/facets-bundle/META-INF /build-output \
+ && printf '%s\n' \
+      'Manifest-Version: 1.0' \
+      'Bundle-ManifestVersion: 2' \
+      'Bundle-Name: Content Lake Facets' \
+      'Bundle-SymbolicName: org.hyland.contentlake.facets' \
+      'Bundle-Version: 1.0.0' \
+      'Nuxeo-Component: OSGI-INF/content-lake-facets-contrib.xml' \
+      > /workspace/facets-bundle/META-INF/MANIFEST.MF \
+ && jar cfm /build-output/content-lake-facets-bundle.jar \
+      /workspace/facets-bundle/META-INF/MANIFEST.MF \
+      -C /workspace/facets-bundle OSGI-INF \
+      -C /workspace/facets-bundle schema
+
 FROM ${NUXEO_BUILD_IMAGE} AS web-ui-build
 
 ARG NUXEO_WEBUI_GIT_REF
@@ -166,13 +187,13 @@ ENV PATH=${NUXEO_HOME}/bin:${PATH}
 COPY --from=source-tree --chown=900:0 /workspace/nuxeo/docker/nuxeo/rootfs/ /
 COPY --from=distribution --chown=900:0 /distrib ${NUXEO_HOME}
 COPY --from=source-build /build-output/nuxeo-source-ref.txt /usr/local/share/nuxeo-source-ref.txt
+COPY --from=facets-bundle --chown=900:0 /build-output/content-lake-facets-bundle.jar ${NUXEO_HOME}/nxserver/bundles/content-lake-facets-bundle.jar
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-marketplace.zip /tmp/nuxeo-web-ui-marketplace.zip
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-version.txt /usr/local/share/nuxeo-web-ui-version.txt
 COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
-COPY --chown=900:0 config/content-lake-facets-contrib.xml ${NUXEO_HOME}/nxserver/config/content-lake-facets-contrib.xml
-COPY --chown=900:0 config/schema/ ${NUXEO_HOME}/nxserver/config/schema/
+COPY scripts/patch-web-ui-config.sh /docker-entrypoint-initnuxeo.d/patch-web-ui-config.sh
 
-RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
+RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh /docker-entrypoint-initnuxeo.d/patch-web-ui-config.sh \
  && /usr/local/bin/check-runtime-tools.sh
 
 RUN mkdir -p /etc/nuxeo \
@@ -182,6 +203,8 @@ RUN mkdir -p /etc/nuxeo \
       --accept=true --relax=true \
  && chown -R 900:0 "${NUXEO_HOME}" /etc/nuxeo /var/lib/nuxeo /var/log/nuxeo \
  && rm -f /tmp/nuxeo-web-ui-marketplace.zip /etc/nuxeo/nuxeo.conf
+
+COPY --chown=900:0 ui/content-lake-folder-control.html ${NUXEO_HOME}/nxserver/nuxeo.war/ui/content-lake-folder-control.html
 
 VOLUME /var/lib/nuxeo
 VOLUME /var/log/nuxeo

@@ -1,0 +1,389 @@
+<!--
+  content-lake-folder-control.html
+  Nuxeo Web UI custom element — Content Lake folder indexing controls.
+
+  Contributes a panel to the DOCUMENT_ACTIONS slot. Renders only when the
+  current document has the Folderish facet. Provides two toggles that mirror
+  the Alfresco ACA ContentLakeSidebarComponent:
+
+    Toggle A — "Index in Content Lake":  adds/removes ContentLakeIndexed facet
+    Toggle B — "Exclude from Content Lake": adds/removes ContentLakeScope +
+               sets/clears cls:excludeFromScope
+
+  Uses Nuxeo automation operations for facet updates because direct document PUT
+  does not persist custom facets reliably in this runtime.
+-->
+<dom-module id="content-lake-folder-control">
+  <template>
+    <style include="nuxeo-action-button-styles nuxeo-styles">
+      :host { display: inline-block; }
+      .action {
+        display: inline-flex;
+        align-items: center;
+      }
+      .label {
+        margin-left: 8px;
+      }
+      .cl-panel {
+        min-width: 320px;
+      }
+      .cl-toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--divider-color, #e0e0e0);
+      }
+      .cl-toggle-row:last-child { border-bottom: none; }
+      .cl-toggle-label { font-size: 12px; color: var(--nuxeo-text-default, #333); flex: 1; padding-right: 12px; }
+      .cl-toggle-label.disabled { opacity: 0.5; }
+      .cl-saving { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--nuxeo-warn-text, #888); padding-top: 6px; }
+      paper-dialog {
+        width: 420px;
+        max-width: calc(100vw - 32px);
+      }
+      paper-toggle-button {
+        --paper-toggle-button-checked-bar-color: var(--nuxeo-action-color, #0066cc);
+        --paper-toggle-button-checked-button-color: var(--nuxeo-action-color, #0066cc);
+      }
+      paper-toggle-button[disabled] { opacity: 0.5; }
+    </style>
+
+    <!-- nuxeo-resource: used to refresh the current document after automation updates -->
+    <nuxeo-resource id="docResource"
+                    path="[[_resourcePath(document.uid)]]"
+                    headers='{"X-NXDocumentProperties":"*"}'></nuxeo-resource>
+    <nuxeo-operation id="automationOp" input="[[document.uid]]"></nuxeo-operation>
+
+    <template is="dom-if" if="[[_isFolderish(document)]]">
+      <div class="action" on-tap="_openDialog">
+        <paper-icon-button id="contentLakeAction" icon="[[_indexedIcon(document.facets)]]" noink
+                           style$="[[_iconStyle(document.facets)]]"
+                           aria-labelledby="contentLakeLabel">
+        </paper-icon-button>
+        <span class="label" hidden$="[[!showLabel]]" id="contentLakeLabel">Content Lake</span>
+        <nuxeo-tooltip>[[_indexedTooltip(document.facets)]]</nuxeo-tooltip>
+      </div>
+
+      <paper-dialog id="dialog" with-backdrop>
+        <h2>Content Lake</h2>
+        <paper-dialog-scrollable>
+          <div class="cl-panel">
+            <!-- Toggle A: ContentLakeIndexed -->
+            <div class="cl-toggle-row">
+              <span class$="cl-toggle-label [[_disabledClass(saving)]]">Index in Content Lake</span>
+              <paper-toggle-button
+                checked="[[_hasIndexedFacet(document)]]"
+                disabled="[[saving]]"
+                on-change="_onIndexedChange">
+              </paper-toggle-button>
+            </div>
+
+            <!-- Toggle B: ContentLakeScope — only shown when Toggle A is on (MVP) -->
+            <template is="dom-if" if="[[_hasIndexedFacet(document)]]">
+              <div class="cl-toggle-row">
+                <span class$="cl-toggle-label [[_disabledClass(saving)]]">Exclude from Content Lake</span>
+                <paper-toggle-button
+                  checked="[[_isExcluded(document)]]"
+                  disabled="[[saving]]"
+                  on-change="_onExcludedChange">
+                </paper-toggle-button>
+              </div>
+            </template>
+
+            <template is="dom-if" if="[[saving]]">
+              <div class="cl-saving">
+                <paper-spinner-lite active></paper-spinner-lite>
+                Saving…
+              </div>
+            </template>
+          </div>
+        </paper-dialog-scrollable>
+        <div class="buttons">
+          <paper-button dialog-dismiss>Close</paper-button>
+        </div>
+      </paper-dialog>
+    </template>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'content-lake-folder-control',
+
+      properties: {
+        document: { type: Object, notify: true },
+        saving: { type: Boolean, value: false },
+        showLabel: { type: Boolean, value: false, reflectToAttribute: true },
+      },
+
+      observers: ['_onDocumentUidChanged(document.uid)'],
+
+      _onDocumentUidChanged(uid) {
+        if (uid) {
+          this.$.docResource.get()
+            .then((fresh) => this._applyUpdate(fresh))
+            .catch(function() {});
+        }
+      },
+
+      _resourcePath(uid) {
+        return uid ? `id/${uid}` : '';
+      },
+
+      _openDialog() {
+        this.$.dialog.open();
+      },
+
+      _isFolderish(doc) {
+        return !!(doc && doc.facets && doc.facets.indexOf('Folderish') !== -1);
+      },
+
+      _indexedIcon(doc) {
+        return this._hasIndexedFacet(doc) ? 'icons:cloud-done' : 'icons:cloud-queue';
+      },
+
+      _iconStyle(doc) {
+        return this._hasIndexedFacet(doc)
+          ? 'color: var(--nuxeo-action-color, #0066cc);'
+          : '';
+      },
+
+      _indexedTooltip(doc) {
+        return this._hasIndexedFacet(doc)
+          ? 'Content Lake (indexed)'
+          : 'Content Lake (not indexed)';
+      },
+
+      _hasIndexedFacet(doc) {
+        return !!(doc && doc.facets && doc.facets.indexOf('ContentLakeIndexed') !== -1);
+      },
+
+      _hasScopeFacet(doc) {
+        return !!(doc && doc.facets && doc.facets.indexOf('ContentLakeScope') !== -1);
+      },
+
+      _isExcluded(doc) {
+        if (!doc || !doc.facets || doc.facets.indexOf('ContentLakeScope') === -1) {
+          return false;
+        }
+        const v = (doc.properties || {})['cls:excludeFromScope'];
+        return v === true || v === 'true';
+      },
+
+      _disabledClass(saving) {
+        return saving ? 'disabled' : '';
+      },
+
+      _onIndexedChange(e) {
+        this._updateFacets(e.target.checked);
+      },
+
+      _onExcludedChange(e) {
+        this._updateExclusion(e.target.checked);
+      },
+
+      _runOperation(op, params) {
+        this.$.automationOp.op = op;
+        this.$.automationOp.input = this.document.uid;
+        this.$.automationOp.params = params;
+        return this.$.automationOp.execute();
+      },
+
+      _refreshDocument() {
+        return this.$.docResource.get().then((fresh) => {
+          this.document = fresh;
+          this._applyUpdate(fresh);
+          return fresh;
+        });
+      },
+
+      _startFolderBackfill(folderPath) {
+        if (!folderPath) {
+          return Promise.reject(new Error('Missing folder path for Content Lake backfill'));
+        }
+        return window.fetch('/api/sync/batch?sourceType=nuxeo', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            includedRoots: [folderPath],
+            includedDocumentTypes: ['File', 'Note'],
+            excludedLifecycleStates: ['deleted'],
+            pageSize: 50,
+            discoveryMode: 'CHILDREN',
+          }),
+        }).then((response) => {
+          if (!response.ok) {
+            throw new Error(`Backfill trigger failed with HTTP ${response.status}`);
+          }
+          return response.json();
+        });
+      },
+
+      _updateFacets(addIndexed) {
+        if (!this.document || !this.document.uid) {
+          return;
+        }
+        this.saving = true;
+        let promise = Promise.resolve();
+        if (addIndexed) {
+          if (!this._hasIndexedFacet(this.document)) {
+            promise = this._runOperation('Document.AddFacet', {
+              facet: 'ContentLakeIndexed',
+              save: true,
+            });
+          }
+        } else {
+          if (this._hasScopeFacet(this.document)) {
+            promise = promise
+              .then(() => this._runOperation('Document.SetProperty', {
+                xpath: 'cls:excludeFromScope',
+                value: false,
+                save: true,
+              }))
+              .then(() => this._runOperation('Document.RemoveFacet', {
+                facet: 'ContentLakeScope',
+                save: true,
+              }));
+          }
+          if (this._hasIndexedFacet(this.document)) {
+            promise = promise.then(() => this._runOperation('Document.RemoveFacet', {
+              facet: 'ContentLakeIndexed',
+              save: true,
+            }));
+          }
+        }
+        promise
+          .then(() => this._refreshDocument())
+          .then((updated) => {
+            this._applyUpdate(updated);
+            if (addIndexed && !this._isExcluded(updated)) {
+              return this._startFolderBackfill(updated.path)
+                .then((job) => {
+                  this._notify(
+                    `Content Lake indexing enabled for this folder. Backfill started (${job.jobId}).`,
+                  );
+                })
+                .catch((err) => {
+                  console.error('[ContentLake] Failed to trigger folder backfill', err);
+                  this._notify(
+                    'Content Lake indexing was enabled, but the folder backfill could not be started',
+                    true,
+                  );
+                });
+            }
+            this._notify('Content Lake indexing disabled for this folder');
+          })
+          .catch((err) => {
+            console.error('[ContentLake] Failed to update ContentLakeIndexed', err);
+            this._notify('Failed to update Content Lake indexing', true);
+          })
+          .finally(() => {
+            this.saving = false;
+          });
+      },
+
+      _updateExclusion(exclude) {
+        if (!this.document || !this.document.uid) {
+          return;
+        }
+        this.saving = true;
+        let promise = Promise.resolve();
+        if (exclude) {
+          if (!this._hasIndexedFacet(this.document)) {
+            promise = promise.then(() => this._runOperation('Document.AddFacet', {
+              facet: 'ContentLakeIndexed',
+              save: true,
+            }));
+          }
+          if (!this._hasScopeFacet(this.document)) {
+            promise = promise.then(() => this._runOperation('Document.AddFacet', {
+              facet: 'ContentLakeScope',
+              save: true,
+            }));
+          }
+          promise = promise.then(() => this._runOperation('Document.SetProperty', {
+            xpath: 'cls:excludeFromScope',
+            value: true,
+            save: true,
+          }));
+        } else if (this._hasScopeFacet(this.document)) {
+          promise = promise
+            .then(() => this._runOperation('Document.SetProperty', {
+              xpath: 'cls:excludeFromScope',
+              value: false,
+              save: true,
+            }))
+            .then(() => this._runOperation('Document.RemoveFacet', {
+              facet: 'ContentLakeScope',
+              save: true,
+            }));
+        }
+        promise
+          .then(() => this._refreshDocument())
+          .then((updated) => {
+            this._applyUpdate(updated);
+            if (!exclude && this._hasIndexedFacet(updated) && !this._isExcluded(updated)) {
+              return this._startFolderBackfill(updated.path)
+                .then((job) => {
+                  this._notify(
+                    `Folder subtree restored to Content Lake scope. Backfill started (${job.jobId}).`,
+                  );
+                })
+                .catch((err) => {
+                  console.error('[ContentLake] Failed to trigger scope-restore backfill', err);
+                  this._notify(
+                    'Folder subtree was restored to scope, but the backfill could not be started',
+                    true,
+                  );
+                });
+            }
+            this._notify(
+              exclude
+                ? 'Folder subtree excluded from Content Lake'
+                : 'Folder subtree restored to Content Lake scope',
+            );
+          })
+          .catch((err) => {
+            console.error('[ContentLake] Failed to update ContentLakeScope', err);
+            this._notify('Failed to update Content Lake exclusion', true);
+          })
+          .finally(() => {
+            this.saving = false;
+          });
+      },
+
+      _applyUpdate(updated) {
+        if (updated && updated.facets) {
+          this.set('document.facets', updated.facets);
+        }
+        if (updated && updated.properties) {
+          Object.keys(updated.properties)
+            .filter((k) => k.indexOf('cls:') === 0)
+            .forEach((k) => this.set(`document.properties.${k}`, updated.properties[k]));
+        }
+      },
+
+      _notify(message, isError) {
+        this.dispatchEvent(new CustomEvent('notify', {
+          bubbles: true,
+          composed: true,
+          detail: { message, dismissible: true, duration: isError ? 0 : 3000 },
+        }));
+      },
+    });
+  </script>
+</dom-module>
+
+<!--
+  Inject into the DOCUMENT_ACTIONS slot (document toolbar).
+  The document property is provided by the slot's parent context.
+  order="100" places the control after standard actions (typically 0–50).
+-->
+<nuxeo-slot-content name="contentLakeFolderControl" slot="DOCUMENT_ACTIONS" order="30">
+  <template>
+    <content-lake-folder-control document="[[document]]"></content-lake-folder-control>
+  </template>
+</nuxeo-slot-content>
