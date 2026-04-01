@@ -197,16 +197,28 @@
         });
       },
 
+      _getAuthHeader() {
+        const conn = document.querySelector('nuxeo-connection');
+        if (!conn) return null;
+        if (conn.username) {
+          return 'Basic ' + btoa(conn.username + ':' + (conn.password || ''));
+        }
+        return null;
+      },
+
       _startFolderBackfill(folderPath) {
         if (!folderPath) {
           return Promise.reject(new Error('Missing folder path for Content Lake backfill'));
         }
+        const headers = { 'Content-Type': 'application/json' };
+        const authHeader = this._getAuthHeader();
+        if (authHeader) {
+          headers['Authorization'] = authHeader;
+        }
         return window.fetch('/api/sync/batch?sourceType=nuxeo', {
           method: 'POST',
           credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             includedRoots: [folderPath],
             includedDocumentTypes: ['File', 'Note'],
