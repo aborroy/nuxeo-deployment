@@ -58,17 +58,13 @@ nuxeo-deployment/
 ├── scripts/
 │   ├── check-bootstrap.sh
 │   ├── check-runtime-tools.sh
+│   ├── patch-web-ui-config.sh           ← patches the Web UI bundle to import local customizations
 │   ├── smoke-conversion.sh
 │   ├── smoke-events.sh
 │   └── smoke-facets.sh                   ← verifies ContentLakeIndexed / ContentLakeScope REST API
 ├── ui/
-│   ├── nuxeo-custom-bundle.html          ← appended into nuxeo-web-ui-bundle.html by the deployment fragment
+│   ├── nuxeo-custom-bundle.html          ← imported into nuxeo-web-ui-bundle.html at container startup
 │   └── content-lake-folder-control.html  ← Polymer element: folder indexing toggles
-├── ui-bundle/                            ← OSGI bundle assembled into nxserver/bundles/ at image build time
-│   ├── META-INF/
-│   │   └── MANIFEST.MF
-│   └── OSGI-INF/
-│       └── deployment-fragment.xml
 ```
 
 ## Local Contract
@@ -233,8 +229,9 @@ a `documentModified` audit event.
 
 ### Web UI — `ui/`
 
-`ui/nuxeo-custom-bundle.html` is the local customization entry point. The runtime deployment
-fragment appends its `<link rel="import" href="nuxeo-custom-bundle.html">` line into
+`ui/nuxeo-custom-bundle.html` is the local customization entry point. The startup helper
+`scripts/patch-web-ui-config.sh` appends its `<link rel="import" href="nuxeo-custom-bundle.html">`
+line into
 `${NUXEO_HOME}/nxserver/nuxeo.war/ui/nuxeo-web-ui-bundle.html`, which is the bundle the running
 Web UI actually loads. The custom bundle then imports `content-lake-folder-control.html`.
 
@@ -251,12 +248,10 @@ Both toggles are disabled while a request is in flight (a `saving` flag mirrors 
 `ContentLakeSidebarComponent` pattern). Facet changes use a GET-then-PUT strategy to preserve any
 pre-existing mixin facets on the document, matching the Alfresco `copyAspectNames` approach.
 
-The Dockerfile assembles `ui-bundle/` into a small jar and copies it to
-`${NUXEO_HOME}/nxserver/bundles/`. On startup, its `deployment-fragment.xml` requires
-`org.nuxeo.web.ui`, unzips `content-lake-folder-control.html` into `nuxeo.war/ui/`, and appends
-`nuxeo-custom-bundle.html` into `nuxeo-web-ui-bundle.html`. That keeps the upstream Web UI bundle
-intact while ensuring the Content Lake slot contribution is loaded on authenticated Web UI
-sessions.
+The Dockerfile copies both HTML files into `${NUXEO_HOME}/nxserver/nuxeo.war/ui/`. On startup,
+`scripts/patch-web-ui-config.sh` idempotently appends the custom bundle import into
+`nuxeo-web-ui-bundle.html`. That keeps the upstream Web UI bundle intact while ensuring the Content
+Lake slot contribution is loaded on authenticated Web UI sessions.
 
 ## Audit and Event Settings
 

@@ -5,3 +5,4 @@
 samples/
 scripts/
 !scripts/check-runtime-tools.sh
+!scripts/patch-web-ui-config.sh
