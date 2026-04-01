@@ -58,13 +58,18 @@ nuxeo-deployment/
 ├── scripts/
 │   ├── check-bootstrap.sh
 │   ├── check-runtime-tools.sh
-│   ├── patch-web-ui-config.sh           ← patches the Web UI bundle to import local customizations
 │   ├── smoke-conversion.sh
 │   ├── smoke-events.sh
 │   └── smoke-facets.sh                   ← verifies ContentLakeIndexed / ContentLakeScope REST API
 ├── ui/
-│   ├── nuxeo-custom-bundle.html          ← imported into nuxeo-web-ui-bundle.html at container startup
+│   ├── index.jsp                         ← local overlay of the Web UI entrypoint with the custom import hook
+│   ├── nuxeo-custom-bundle.html          ← imports the Content Lake folder control after Web UI boots
 │   └── content-lake-folder-control.html  ← Polymer element: folder indexing toggles
+├── ui-bundle/
+│   ├── META-INF/
+│   │   └── MANIFEST.MF
+│   └── OSGI-INF/
+│       └── deployment-fragment.xml       ← unzips the overlay files into nuxeo.war during deployment
 ```
 
 ## Local Contract
@@ -229,11 +234,13 @@ a `documentModified` audit event.
 
 ### Web UI — `ui/`
 
-`ui/nuxeo-custom-bundle.html` is the local customization entry point. The startup helper
-`scripts/patch-web-ui-config.sh` appends its `<link rel="import" href="nuxeo-custom-bundle.html">`
-line into
-`${NUXEO_HOME}/nxserver/nuxeo.war/ui/nuxeo-web-ui-bundle.html`, which is the bundle the running
-Web UI actually loads. The custom bundle then imports `content-lake-folder-control.html`.
+This Web UI build does not expose a standalone `nuxeo-web-ui-bundle.html` on disk before the
+server deploys bundles, so local customizations are packaged as a small overlay bundle instead of a
+container-startup patch.
+
+`ui/index.jsp` is a repo-managed overlay of the upstream Web UI entrypoint. It adds a small
+post-boot import hook so `ui/nuxeo-custom-bundle.html` loads only after the main Web UI bundle has
+initialized. The custom bundle then imports `content-lake-folder-control.html`.
 
 `ui/content-lake-folder-control.html` is a Polymer 3 custom element that contributes a panel to
 the `DOCUMENT_ACTIONS` slot in the document toolbar. It renders only on documents that have the
@@ -248,10 +255,11 @@ Both toggles are disabled while a request is in flight (a `saving` flag mirrors 
 `ContentLakeSidebarComponent` pattern). Facet changes use a GET-then-PUT strategy to preserve any
 pre-existing mixin facets on the document, matching the Alfresco `copyAspectNames` approach.
 
-The Dockerfile copies both HTML files into `${NUXEO_HOME}/nxserver/nuxeo.war/ui/`. On startup,
-`scripts/patch-web-ui-config.sh` idempotently appends the custom bundle import into
-`nuxeo-web-ui-bundle.html`. That keeps the upstream Web UI bundle intact while ensuring the Content
-Lake slot contribution is loaded on authenticated Web UI sessions.
+The Dockerfile assembles `ui-bundle/` into a small jar and copies it to
+`${NUXEO_HOME}/nxserver/bundles/`. On startup, its `deployment-fragment.xml` overlays
+`index.jsp`, `nuxeo-custom-bundle.html`, and `content-lake-folder-control.html` into
+`nuxeo.war/ui/`. That keeps the customization aligned with the bundle deployment lifecycle while
+ensuring the Content Lake slot contribution is loaded on authenticated Web UI sessions.
 
 ## Audit and Event Settings
 

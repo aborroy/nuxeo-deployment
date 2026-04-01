@@ -61,6 +61,22 @@ RUN mkdir -p /workspace/facets-bundle/META-INF /build-output \
       -C /workspace/facets-bundle OSGI-INF \
       -C /workspace/facets-bundle schema
 
+FROM ${NUXEO_BUILD_IMAGE} AS ui-overlay-bundle
+
+WORKDIR /workspace/ui-bundle
+
+COPY ui-bundle/META-INF/MANIFEST.MF /workspace/ui-bundle/META-INF/MANIFEST.MF
+COPY ui-bundle/OSGI-INF/deployment-fragment.xml /workspace/ui-bundle/OSGI-INF/deployment-fragment.xml
+COPY ui/index.jsp /workspace/ui-bundle/web/nuxeo.war/ui/index.jsp
+COPY ui/nuxeo-custom-bundle.html /workspace/ui-bundle/web/nuxeo.war/ui/nuxeo-custom-bundle.html
+COPY ui/content-lake-folder-control.html /workspace/ui-bundle/web/nuxeo.war/ui/content-lake-folder-control.html
+
+RUN mkdir -p /build-output \
+ && jar cfm /build-output/content-lake-ui-bundle.jar \
+      /workspace/ui-bundle/META-INF/MANIFEST.MF \
+      -C /workspace/ui-bundle OSGI-INF \
+      -C /workspace/ui-bundle web
+
 FROM ${NUXEO_BUILD_IMAGE} AS web-ui-build
 
 ARG NUXEO_WEBUI_GIT_REF
@@ -188,12 +204,12 @@ COPY --from=source-tree --chown=900:0 /workspace/nuxeo/docker/nuxeo/rootfs/ /
 COPY --from=distribution --chown=900:0 /distrib ${NUXEO_HOME}
 COPY --from=source-build /build-output/nuxeo-source-ref.txt /usr/local/share/nuxeo-source-ref.txt
 COPY --from=facets-bundle --chown=900:0 /build-output/content-lake-facets-bundle.jar ${NUXEO_HOME}/nxserver/bundles/content-lake-facets-bundle.jar
+COPY --from=ui-overlay-bundle --chown=900:0 /build-output/content-lake-ui-bundle.jar ${NUXEO_HOME}/nxserver/bundles/content-lake-ui-bundle.jar
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-marketplace.zip /tmp/nuxeo-web-ui-marketplace.zip
 COPY --from=web-ui-build /build-output/nuxeo-web-ui-version.txt /usr/local/share/nuxeo-web-ui-version.txt
 COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
-COPY scripts/patch-web-ui-config.sh /docker-entrypoint-initnuxeo.d/patch-web-ui-config.sh
 
-RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh /docker-entrypoint-initnuxeo.d/patch-web-ui-config.sh \
+RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
  && /usr/local/bin/check-runtime-tools.sh
 
 RUN mkdir -p /etc/nuxeo \
@@ -203,9 +219,6 @@ RUN mkdir -p /etc/nuxeo \
       --accept=true --relax=true \
  && chown -R 900:0 "${NUXEO_HOME}" /etc/nuxeo /var/lib/nuxeo /var/log/nuxeo \
  && rm -f /tmp/nuxeo-web-ui-marketplace.zip /etc/nuxeo/nuxeo.conf
-
-COPY --chown=900:0 ui/nuxeo-custom-bundle.html ${NUXEO_HOME}/nxserver/nuxeo.war/ui/nuxeo-custom-bundle.html
-COPY --chown=900:0 ui/content-lake-folder-control.html ${NUXEO_HOME}/nxserver/nuxeo.war/ui/content-lake-folder-control.html
 
 VOLUME /var/lib/nuxeo
 VOLUME /var/log/nuxeo

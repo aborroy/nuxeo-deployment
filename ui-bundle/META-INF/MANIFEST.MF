@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Content Lake UI Overlay
+Bundle-SymbolicName: org.hyland.contentlake.web.ui;singleton:=true
+Bundle-Version: 1.0.0
+Require-Bundle: org.nuxeo.web.ui
+Nuxeo-RequiredBy: org.nuxeo.ecm.war
