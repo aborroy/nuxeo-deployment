@@ -241,13 +241,7 @@
         this.saving = true;
         let promise = Promise.resolve();
         if (addIndexed) {
-          if (!this._hasIndexedFacet(this.document)) {
-            promise = this._runOperation('Document.AddFacet', {
-              facet: 'ContentLakeIndexed',
-              save: true,
-            });
-          }
-        } else {
+          // Re-enabling: clear any explicit exclusion first, then mark as indexed.
           if (this._hasScopeFacet(this.document)) {
             promise = promise
               .then(() => this._runOperation('Document.SetProperty', {
@@ -260,6 +254,28 @@
                 save: true,
               }));
           }
+          if (!this._hasIndexedFacet(this.document)) {
+            promise = promise.then(() => this._runOperation('Document.AddFacet', {
+              facet: 'ContentLakeIndexed',
+              save: true,
+            }));
+          }
+        } else {
+          // Disabling: add ContentLakeScope with cls:excludeFromScope=true so that the
+          // live ingester's reevaluateSubtree correctly marks all descendants as
+          // out-of-scope and removes them from hxpr — even when the folder sits inside
+          // a configured includedRoot.
+          if (!this._hasScopeFacet(this.document)) {
+            promise = promise.then(() => this._runOperation('Document.AddFacet', {
+              facet: 'ContentLakeScope',
+              save: true,
+            }));
+          }
+          promise = promise.then(() => this._runOperation('Document.SetProperty', {
+            xpath: 'cls:excludeFromScope',
+            value: true,
+            save: true,
+          }));
           if (this._hasIndexedFacet(this.document)) {
             promise = promise.then(() => this._runOperation('Document.RemoveFacet', {
               facet: 'ContentLakeIndexed',
