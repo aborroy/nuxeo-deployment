@@ -131,7 +131,7 @@
       },
 
       _openDialog() {
-        this.$.dialog.open();
+        this.$$('#dialog').open();
       },
 
       _isFolderish(doc) {
@@ -139,11 +139,11 @@
       },
 
       _indexedIcon(doc) {
-        return this._hasIndexedFacet(doc) ? 'icons:cloud-done' : 'icons:cloud-queue';
+        return 'icons:device-hub';
       },
 
-      _iconStyle(doc) {
-        return this._hasIndexedFacet(doc)
+      _iconStyle(facets) {
+        return facets && facets.indexOf('ContentLakeIndexed') !== -1
           ? 'color: var(--nuxeo-action-color, #0066cc);'
           : '';
       },
