@@ -197,11 +197,25 @@
         });
       },
 
-      _getAuthHeader() {
+      _getNuxeoAuthToken() {
         const conn = document.querySelector('nuxeo-connection');
-        if (!conn) return null;
-        if (conn.username) {
-          return 'Basic ' + btoa(conn.username + ':' + (conn.password || ''));
+        if (!conn) {
+          return null;
+        }
+        const candidates = [
+          conn.authToken,
+          conn.token,
+          conn._authToken,
+          conn.headers && conn.headers['X-Authentication-Token'],
+          conn._headers && conn._headers['X-Authentication-Token'],
+          conn.client && conn.client.authToken,
+          conn.client && conn.client.token,
+        ];
+        for (let i = 0; i < candidates.length; i += 1) {
+          const candidate = candidates[i];
+          if (typeof candidate === 'string' && candidate.trim()) {
+            return candidate.trim();
+          }
         }
         return null;
       },
@@ -211,9 +225,9 @@
           return Promise.reject(new Error('Missing folder path for Content Lake backfill'));
         }
         const headers = { 'Content-Type': 'application/json' };
-        const authHeader = this._getAuthHeader();
-        if (authHeader) {
-          headers['Authorization'] = authHeader;
+        const authToken = this._getNuxeoAuthToken();
+        if (authToken) {
+          headers['X-Authentication-Token'] = authToken;
         }
         return window.fetch('/api/sync/batch?sourceType=nuxeo', {
           method: 'POST',
