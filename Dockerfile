@@ -218,7 +218,9 @@ COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
 RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
  && /usr/local/bin/check-runtime-tools.sh
 
-RUN mkdir -p /etc/nuxeo \
+RUN JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(which java)")")")" \
+ && export JAVA_HOME \
+ && mkdir -p /etc/nuxeo \
  && printf 'nuxeo.home=%s\nnuxeo.data.dir=/var/lib/nuxeo\nnuxeo.log.dir=/var/log/nuxeo\nnuxeo.tmp.dir=/tmp\n' \
       "${NUXEO_HOME}" > /etc/nuxeo/nuxeo.conf \
  && "${NUXEO_HOME}/bin/nuxeoctl" mp-install /tmp/nuxeo-web-ui-marketplace.zip \
