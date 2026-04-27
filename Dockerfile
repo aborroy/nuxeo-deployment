@@ -187,15 +187,12 @@ RUN rpm --import https://repos.azulsystems.com/RPM-GPG-KEY-azulsystems \
     zulu21-jre-headless \
  && dnf clean all \
  && rm -rf /var/cache /var/tmp/* \
- && update-alternatives --install /usr/bin/java java /usr/lib/jvm/zulu-21-headless/bin/java 2100
+ && update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-21-zulu-openjdk-ca/bin/java 2100
 
-# LibreOffice pulls in Java 17. Pin JAVA_HOME to the Zulu 21 installation so
-# nuxeoctl and the running container always use the right JVM.
-# The path is discovered at build time via rpm query to avoid hardcoding version strings.
-RUN echo "JAVA_HOME=$(rpm -ql zulu21-jre-headless 2>/dev/null | grep '/bin/java$' | head -1 | xargs dirname | xargs dirname)" \
-      > /etc/profile.d/zulu21.sh \
- && chmod +x /etc/profile.d/zulu21.sh
-ENV JAVA_HOME=/usr/lib/jvm/zulu-21
+# zulu21-jre-headless is a meta-package; the JRE lands in java-21-zulu-openjdk-ca.
+# LibreOffice pulls in Java 17 -- pin JAVA_HOME and PATH to Zulu 21 so nuxeoctl
+# and the running container always use the right JVM.
+ENV JAVA_HOME=/usr/lib/jvm/java-21-zulu-openjdk-ca
 ENV PATH=${JAVA_HOME}/bin:${PATH}
 
 RUN find /var/log -type f -delete \
@@ -222,12 +219,7 @@ COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
 RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
  && /usr/local/bin/check-runtime-tools.sh
 
-RUN ZULU_JAVA="$(rpm -ql zulu21-jre-headless 2>/dev/null | grep '/bin/java$' | head -1)" \
- && JAVA_HOME="$(dirname "$(dirname "$ZULU_JAVA")")" \
- && export JAVA_HOME \
- && echo "Using JAVA_HOME=${JAVA_HOME}" \
- && "${JAVA_HOME}/bin/java" -version \
- && mkdir -p /etc/nuxeo \
+RUN mkdir -p /etc/nuxeo \
  && printf 'nuxeo.home=%s\nnuxeo.data.dir=/var/lib/nuxeo\nnuxeo.log.dir=/var/log/nuxeo\nnuxeo.tmp.dir=/tmp\nJAVA_HOME=%s\n' \
       "${NUXEO_HOME}" "${JAVA_HOME}" > /etc/nuxeo/nuxeo.conf \
  && "${NUXEO_HOME}/bin/nuxeoctl" mp-install /tmp/nuxeo-web-ui-marketplace.zip \
