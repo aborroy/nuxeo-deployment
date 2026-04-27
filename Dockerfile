@@ -186,7 +186,13 @@ RUN rpm --import https://repos.azulsystems.com/RPM-GPG-KEY-azulsystems \
     wget \
     zulu21-jre-headless \
  && dnf clean all \
- && rm -rf /var/cache /var/tmp/*
+ && rm -rf /var/cache /var/tmp/* \
+ && update-alternatives --set java /usr/lib/jvm/zulu-21-headless/bin/java
+
+# LibreOffice pulls in Java 17 which lands in PATH before Zulu 21.
+# Pin JAVA_HOME and prepend the Zulu 21 bin so nuxeoctl always picks the right JVM.
+ENV JAVA_HOME=/usr/lib/jvm/zulu-21-headless
+ENV PATH=${JAVA_HOME}/bin:${PATH}
 
 RUN find /var/log -type f -delete \
  && find / -ignore_readdir_race -perm 6000 -type f -exec chmod a-s {} \; || true
