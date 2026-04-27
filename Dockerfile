@@ -189,9 +189,13 @@ RUN rpm --import https://repos.azulsystems.com/RPM-GPG-KEY-azulsystems \
  && rm -rf /var/cache /var/tmp/* \
  && update-alternatives --install /usr/bin/java java /usr/lib/jvm/zulu-21-headless/bin/java 2100
 
-# LibreOffice pulls in Java 17 which lands in PATH before Zulu 21.
-# Pin JAVA_HOME and prepend the Zulu 21 bin so nuxeoctl always picks the right JVM.
-ENV JAVA_HOME=/usr/lib/jvm/zulu-21-headless
+# LibreOffice pulls in Java 17. Pin JAVA_HOME to the Zulu 21 installation so
+# nuxeoctl and the running container always use the right JVM.
+# The path is discovered at build time via rpm query to avoid hardcoding version strings.
+RUN echo "JAVA_HOME=$(rpm -ql zulu21-jre-headless 2>/dev/null | grep '/bin/java$' | head -1 | xargs dirname | xargs dirname)" \
+      > /etc/profile.d/zulu21.sh \
+ && chmod +x /etc/profile.d/zulu21.sh
+ENV JAVA_HOME=/usr/lib/jvm/zulu-21
 ENV PATH=${JAVA_HOME}/bin:${PATH}
 
 RUN find /var/log -type f -delete \
@@ -218,11 +222,14 @@ COPY scripts/check-runtime-tools.sh /usr/local/bin/check-runtime-tools.sh
 RUN chmod +x /docker-entrypoint.sh /install-packages.sh /nuxeo-run-dev.sh /usr/local/bin/check-runtime-tools.sh \
  && /usr/local/bin/check-runtime-tools.sh
 
-RUN JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(which java)")")")" \
+RUN ZULU_JAVA="$(rpm -ql zulu21-jre-headless 2>/dev/null | grep '/bin/java$' | head -1)" \
+ && JAVA_HOME="$(dirname "$(dirname "$ZULU_JAVA")")" \
  && export JAVA_HOME \
+ && echo "Using JAVA_HOME=${JAVA_HOME}" \
+ && "${JAVA_HOME}/bin/java" -version \
  && mkdir -p /etc/nuxeo \
- && printf 'nuxeo.home=%s\nnuxeo.data.dir=/var/lib/nuxeo\nnuxeo.log.dir=/var/log/nuxeo\nnuxeo.tmp.dir=/tmp\n' \
-      "${NUXEO_HOME}" > /etc/nuxeo/nuxeo.conf \
+ && printf 'nuxeo.home=%s\nnuxeo.data.dir=/var/lib/nuxeo\nnuxeo.log.dir=/var/log/nuxeo\nnuxeo.tmp.dir=/tmp\nJAVA_HOME=%s\n' \
+      "${NUXEO_HOME}" "${JAVA_HOME}" > /etc/nuxeo/nuxeo.conf \
  && "${NUXEO_HOME}/bin/nuxeoctl" mp-install /tmp/nuxeo-web-ui-marketplace.zip \
       --accept=true --relax=true \
  && chown -R 900:0 "${NUXEO_HOME}" /etc/nuxeo /var/lib/nuxeo /var/log/nuxeo \
