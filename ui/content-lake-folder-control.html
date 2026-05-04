@@ -114,6 +114,7 @@
         document: { type: Object, notify: true },
         saving: { type: Boolean, value: false },
         showLabel: { type: Boolean, value: false, reflectToAttribute: true },
+        batchIngesterUrl: { type: String, value: '' },
       },
 
       observers: ['_onDocumentUidChanged(document.uid)'],
@@ -229,7 +230,7 @@
         if (authToken) {
           headers['X-Authentication-Token'] = authToken;
         }
-        return window.fetch('/api/sync/batch?sourceType=nuxeo', {
+        return window.fetch((this.batchIngesterUrl || '') + '/api/sync/batch', {
           method: 'POST',
           credentials: 'same-origin',
           headers,
@@ -426,6 +427,8 @@
 -->
 <nuxeo-slot-content name="contentLakeFolderControl" slot="DOCUMENT_ACTIONS" order="30">
   <template>
-    <content-lake-folder-control document="[[document]]"></content-lake-folder-control>
+    <content-lake-folder-control document="[[document]]"
+                                  batch-ingester-url="http://localhost:9093">
+    </content-lake-folder-control>
   </template>
 </nuxeo-slot-content>
