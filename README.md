@@ -101,11 +101,11 @@ These values are represented in `.env` and `compose.yaml`.
 ## Pinned Upstream Ref
 
 - tracked public branch: `2025`
-- pinned default source ref: `61e3b800592283b4e7d0838baeed38f6218921e3`
+- pinned default source ref: `9531f6bcb93a82f7c252c5d3bce52104d41a4857`
 - archive URL used by default:
-  `https://github.com/nuxeo/nuxeo/archive/61e3b800592283b4e7d0838baeed38f6218921e3.tar.gz`
+  `https://github.com/nuxeo/nuxeo/archive/9531f6bcb93a82f7c252c5d3bce52104d41a4857.tar.gz`
 
-The SHA above was resolved from the public `nuxeo/nuxeo` branch `2025` on March 25, 2026, then
+The SHA above was resolved from the public `nuxeo/nuxeo` branch `2025` on May 26, 2026, then
 written into repo-managed config so local builds remain reproducible.
 
 ## Build Strategy
