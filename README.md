@@ -1,6 +1,22 @@
 # nuxeo-deployment
 
-Nuxeo LTS deployment built from source code.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
+[![Status](https://img.shields.io/badge/Status-PoC-yellow.svg)]()
+
+Local Nuxeo LTS stack built from public source -- provides the Nuxeo server required by the Content Lake Nuxeo ingestion pipeline.
+
+## Content Lake Ecosystem
+
+Part of the **Content Lake** ecosystem -- a PoC for ingesting Alfresco and Nuxeo content into [hxpr](https://github.com/HylandSoftware/hxpr) for hybrid semantic search and RAG.
+
+| Repo | Role |
+|---|---|
+| [content-lake-app](https://github.com/aborroy/content-lake-app) | Java ingestion pipeline and RAG service |
+| [content-lake-app-deployment](https://github.com/aborroy/content-lake-app-deployment) | Docker Compose stack that wires everything together |
+| [alfresco-content-lake-ui](https://github.com/aborroy/alfresco-content-lake-ui) | ACA/ADW extension: semantic search + RAG chat sidebar |
+| [content-lake-app-ui](https://github.com/aborroy/content-lake-app-ui) | Standalone demo UI (Alfresco + Nuxeo dual auth) |
+| **[nuxeo-deployment](https://github.com/aborroy/nuxeo-deployment)** | Local Nuxeo + PostgreSQL stack (this repo) |
 
 ## Status
 
@@ -15,7 +31,7 @@ Nuxeo LTS deployment built from source code.
 - audit and event system enabled by default (see [Audit and Event Settings](#audit-and-event-settings))
 - working event smoke test
 - working conversion smoke test with REST-based rendition verification
-- consumption patterns documented for `alfresco-content-lake-deploy`
+- consumption patterns documented for `content-lake-app-deployment`
 - sample assets directory
 - Content Lake facet definitions (`ContentLakeIndexed`, `ContentLakeScope`, `cls:excludeFromScope`)
   deployed into the Nuxeo server config at build time (see [Content Lake Customizations](#content-lake-customizations))
@@ -162,7 +178,7 @@ Key values in `.env`:
 ## Consuming This Image
 
 The image built by this project (`nuxeo-deployment:nuxeo-local`) can be used in two modes by
-downstream projects such as `alfresco-content-lake-deploy`.
+downstream projects such as `content-lake-app-deployment`.
 
 ### Local / Manual Mode
 
@@ -185,7 +201,7 @@ without the full downstream stack.
 
 ### Container Network Mode
 
-When `alfresco-content-lake-deploy` (or any other project with its own `compose.yaml`) needs to
+When `content-lake-app-deployment` (or any other project with its own `compose.yaml`) needs to
 include Nuxeo as a service, reference the pre-built image directly instead of using `nuxeo:latest`:
 
 ```yaml
@@ -264,7 +280,7 @@ ensuring the Content Lake slot contribution is loaded on authenticated Web UI se
 ## Audit and Event Settings
 
 The `nuxeo.stream.audit.enabled` and `audit.elasticsearch.enabled` overrides that appeared in the
-old `alfresco-content-lake-deploy/compose.nuxeo.yaml` are not carried into this project.
+old `content-lake-app-deployment/compose.nuxeo.yaml` are not carried into this project.
 
 - `nuxeo.stream.audit.enabled` defaults to `true`. Disabling it would prevent `smoke-events.sh`
   from finding `documentCreated` / `documentModified` entries in the Nuxeo audit log.

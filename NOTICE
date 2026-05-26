@@ -1,0 +1,11 @@
+nuxeo-deployment
+Copyright 2024-2025 Hyland Software, Inc.
+
+This product is licensed under the Apache License, Version 2.0.
+
+This repository assembles a local Nuxeo LTS server image from the public Nuxeo source tree
+(https://github.com/nuxeo/nuxeo, Apache License 2.0) and the public Nuxeo Web UI source
+(https://github.com/nuxeo/nuxeo-web-ui, Apache License 2.0).
+
+The original Nuxeo source code is copyright Hyland Software, Inc. and contributors.
+See the upstream repositories for their full license and attribution notices.
