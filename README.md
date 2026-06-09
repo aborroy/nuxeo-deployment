@@ -24,8 +24,8 @@ Part of the **Content Lake** ecosystem -- a PoC for ingesting Alfresco and Nuxeo
 - `compose.yaml` contract for local PostgreSQL-backed Nuxeo
 - `Dockerfile` that builds the Nuxeo server from the public `nuxeo/nuxeo` source tree
 - runtime package installation for LibreOffice, Poppler, ImageMagick, Ghostscript, and FFmpeg
-  (full FFmpeg with H.264 support via RPM Fusion Free — not the codec-crippled `ffmpeg-free`)
-- Nuxeo Web UI built from public `nuxeo/nuxeo-web-ui` source (`lts-2025` branch, pinned to `v2025.13.0`) and pre-installed into the image without requiring a Nuxeo Connect account
+  (full FFmpeg with H.264 support via RPM Fusion Free -- not the codec-crippled `ffmpeg-free`)
+- Nuxeo Web UI built from public `nuxeo/nuxeo-web-ui` source (`lts-2025` branch, pinned to `v2025.15.0`) and pre-installed into the image without requiring a Nuxeo Connect account
 - pinned upstream ref in `.env`
 - runtime PATH verifier for required conversion binaries
 - audit and event system enabled by default (see [Audit and Event Settings](#audit-and-event-settings))
@@ -171,7 +171,7 @@ Key values in `.env`:
 - `NUXEO_SOURCE_ARCHIVE_URL`: pinned archive URL used by the Docker build
 - `NUXEO_PLATFORM`: defaults to `linux/amd64` for predictable local behavior
 - `POSTGRES_IMAGE`: defaults to `postgres:16-alpine`
-- `NUXEO_PACKAGES`: empty by default — Nuxeo Web UI is pre-installed into the image at build time and does not need to be listed here
+- `NUXEO_PACKAGES`: empty by default -- Nuxeo Web UI is pre-installed into the image at build time and does not need to be listed here
 - `NUXEO_WEBUI_GIT_REF`: exact public source ref of `nuxeo/nuxeo-web-ui` used for the web UI build
 - `NUXEO_WEBUI_VERSION`: version string used to locate the Maven output zip (must match the ref above)
 
@@ -223,7 +223,7 @@ Within the shared Docker Compose network the service is reachable at `http://nux
 This deployment extends a stock Nuxeo server with two layers of customization for the Content Lake
 indexing pipeline.
 
-### Content model — `config/`
+### Content model -- `config/`
 
 `config/content-lake-facets-contrib.xml` registers two custom facets via the
 `org.nuxeo.ecm.core.schema.TypeService` extension point:
@@ -248,7 +248,7 @@ documents enter the ingestion pipeline. `NuxeoAuditListener` (nuxeo-live-ingeste
 the scope cache and triggers subtree re-evaluation whenever a folder carrying either facet receives
 a `documentModified` audit event.
 
-### Web UI — `ui/`
+### Web UI -- `ui/`
 
 This Web UI build does not expose a standalone `nuxeo-web-ui-bundle.html` on disk before the
 server deploys bundles, so local customizations are packaged as a small overlay bundle instead of a
