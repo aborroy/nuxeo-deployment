@@ -34,11 +34,15 @@ RUN --mount=type=cache,id=nuxeo-maven,target=/root/.m2 \
  && mvn -nsu install -Pdistrib -pl server/nuxeo-server-tomcat -am \
       -DskipTests \
       -Dnuxeo.skip.enforcer=true \
-      -T"${NUXEO_BUILD_THREADS}"
+      -T"${NUXEO_BUILD_THREADS}" \
+ && mvn -nsu -q -N -f parent/pom.xml \
+      help:evaluate -Dexpression=project.version -DforceStdout \
+      > /workspace/nuxeo/.nuxeo-parent-version
 
 RUN mkdir -p /build-output \
  && cp server/nuxeo-server-tomcat/target/nuxeo-server-tomcat-*.zip /build-output/nuxeo-server-tomcat.zip \
- && cp .nuxeo-source-ref /build-output/nuxeo-source-ref.txt
+ && cp .nuxeo-source-ref /build-output/nuxeo-source-ref.txt \
+ && cp .nuxeo-parent-version /build-output/nuxeo-parent-version.txt
 
 FROM ${NUXEO_BUILD_IMAGE} AS facets-bundle
 
@@ -82,8 +86,12 @@ FROM ${NUXEO_BUILD_IMAGE} AS web-ui-build
 ARG NUXEO_WEBUI_GIT_REF
 ARG NUXEO_WEBUI_VERSION
 
+# Node 20 (from NodeSource), not Debian's distro nodejs (18.x): the nuxeo-web-ui build's
+# copy-webpack-plugin uses Array.prototype.toSorted(), which requires Node >= 20.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nodejs npm \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+ && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/web-ui
@@ -93,13 +101,18 @@ RUN curl -fsSL "https://github.com/nuxeo/nuxeo-web-ui/archive/${NUXEO_WEBUI_GIT_
  && tar -xzf /tmp/nuxeo-web-ui-source.tar.gz --strip-components=1 \
  && rm /tmp/nuxeo-web-ui-source.tar.gz
 
-# The nuxeo-web-ui pom declares nuxeo-parent:2025.12 (a release version behind auth).
-# The source-build stage builds all Nuxeo artifacts at 2025.13-SNAPSHOT and installs them
-# into the shared Maven cache (id=nuxeo-maven).  Patch the parent version to match.
-RUN sed -i '/nuxeo-parent/{n;s|<version>2025\.12</version>|<version>2025.13-SNAPSHOT</version>|}' pom.xml
-
-# Force ordering: source-build must complete (and populate the shared Maven cache) first.
+# The nuxeo-web-ui pom declares a fixed nuxeo-parent release version (behind Nuxeo Connect auth).
+# The source-build stage builds nuxeo-parent from the pinned Nuxeo source into the shared Maven
+# cache (id=nuxeo-maven) and records the exact version it produced. Patch the web-ui parent to
+# that version, read from the emitted file, so the two never drift and no version is hardcoded.
+# Copying these files also forces ordering: source-build must complete (and populate the shared
+# Maven cache) before this build runs.
+COPY --from=source-build /build-output/nuxeo-parent-version.txt /tmp/nuxeo-parent-version.txt
 COPY --from=source-build /build-output/nuxeo-source-ref.txt /tmp/nuxeo-source-ref.txt
+RUN NUXEO_PARENT_VERSION="$(tr -d '[:space:]' < /tmp/nuxeo-parent-version.txt)" \
+ && test -n "$NUXEO_PARENT_VERSION" || { echo "empty nuxeo-parent version from source-build" >&2; exit 1; } \
+ && echo "Patching nuxeo-web-ui parent to nuxeo-parent:${NUXEO_PARENT_VERSION}" \
+ && sed -i "/nuxeo-parent/{n;s|<version>[^<]*</version>|<version>${NUXEO_PARENT_VERSION}</version>|}" pom.xml
 
 RUN --mount=type=cache,id=nuxeo-maven,target=/root/.m2 \
     printf '%s\n' \
@@ -125,9 +138,11 @@ RUN --mount=type=cache,id=nuxeo-maven,target=/root/.m2 \
       -DskipTests -DskipITs \
       -pl plugin/web-ui/marketplace -am \
  && mkdir -p /build-output \
- && cp plugin/web-ui/marketplace/target/nuxeo-web-ui-marketplace-${NUXEO_WEBUI_VERSION}.zip \
-      /build-output/nuxeo-web-ui-marketplace.zip \
- && printf '%s\n' "${NUXEO_WEBUI_VERSION}" > /build-output/nuxeo-web-ui-version.txt
+ && webui_zip="$(ls plugin/web-ui/marketplace/target/nuxeo-web-ui-marketplace-*.zip | head -1)" \
+ && test -n "$webui_zip" || { echo "no nuxeo-web-ui marketplace zip produced" >&2; exit 1; } \
+ && cp "$webui_zip" /build-output/nuxeo-web-ui-marketplace.zip \
+ && basename "$webui_zip" | sed 's|^nuxeo-web-ui-marketplace-||; s|\.zip$||' \
+      > /build-output/nuxeo-web-ui-version.txt
 
 FROM ${NUXEO_DISTRIB_IMAGE} AS distribution
 
