@@ -25,7 +25,7 @@ Part of the **Content Lake** ecosystem -- a PoC for ingesting Alfresco and Nuxeo
 - `Dockerfile` that builds the Nuxeo server from the public `nuxeo/nuxeo` source tree
 - runtime package installation for LibreOffice, Poppler, ImageMagick, Ghostscript, and FFmpeg
   (full FFmpeg with H.264 support via RPM Fusion Free -- not the codec-crippled `ffmpeg-free`)
-- Nuxeo Web UI built from public `nuxeo/nuxeo-web-ui` source (`lts-2025` branch, pinned to `v2025.15.0`) and pre-installed into the image without requiring a Nuxeo Connect account
+- Nuxeo Web UI built from public `nuxeo/nuxeo-web-ui` source (`lts-2025` branch, pinned to `v2025.18.0`) and pre-installed into the image without requiring a Nuxeo Connect account
 - pinned upstream ref in `.env`
 - runtime PATH verifier for required conversion binaries
 - audit and event system enabled by default (see [Audit and Event Settings](#audit-and-event-settings))
@@ -101,12 +101,16 @@ These values are represented in `.env` and `compose.yaml`.
 ## Pinned Upstream Ref
 
 - tracked public branch: `2025`
-- pinned default source ref: `9531f6bcb93a82f7c252c5d3bce52104d41a4857`
+- pinned default source ref: `bf565575542bc0a77485dcbc51f691b243efbb01`
 - archive URL used by default:
-  `https://github.com/nuxeo/nuxeo/archive/9531f6bcb93a82f7c252c5d3bce52104d41a4857.tar.gz`
+  `https://github.com/nuxeo/nuxeo/archive/bf565575542bc0a77485dcbc51f691b243efbb01.tar.gz`
+- pinned Web UI ref: `0527b4c75cf3ee60183122b956b74f9a4a1159a5` (release tag `v2025.18.0`)
 
-The SHA above was resolved from the public `nuxeo/nuxeo` branch `2025` on May 26, 2026, then
-written into repo-managed config so local builds remain reproducible.
+The server SHA was resolved from the public `nuxeo/nuxeo` branch `2025` on August 26, 2026, then
+written into repo-managed config so local builds remain reproducible. The public 2025 LTS server
+has no release tags or published artifacts (branch HEAD is `2025.20-SNAPSHOT`, and released
+`nuxeo-parent` versions live behind Nuxeo Connect), so the server is necessarily built from the
+`2025` branch as a SNAPSHOT; the Web UI, by contrast, is pinned to the public release tag `v2025.18.0`.
 
 ## Build Strategy
 
